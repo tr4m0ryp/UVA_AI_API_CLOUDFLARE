@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UvA API Gateway</title>
+    <meta name="theme-color" content="#bc0031">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/endpoints.css">
+    <link rel="stylesheet" href="css/logs.css">
+</head>
+<body>
+
+<!-- Login Page -->
+<div id="page-login">
+    <div class="login-card">
+        <img src="img/uva-logo.svg" alt="UvA" style="height: 40px; margin-bottom: 16px;">
+        <h1>API Gateway</h1>
+        <p class="subtitle">Self-hosted API endpoint manager</p>
+
+        <button id="btn-browser-login" class="btn-browser">Login with UvA Account</button>
+
+        <div id="browser-login-status" class="hidden">
+            <span class="spinner"></span>
+            <span id="browser-status-text">Opening browser...</span>
+        </div>
+
+        <div id="login-error" class="error-msg hidden"></div>
+
+        <p class="login-hint">Uses your existing UvA session from Firefox or Chrome</p>
+    </div>
+</div>
+
+<!-- App Shell -->
+<div id="app-shell" class="app-shell hidden">
+
+    <!-- Mobile toggle -->
+    <button id="mobile-sidebar-toggle" class="mobile-toggle">
+        <span class="material-symbols-outlined">menu</span>
+    </button>
+
+    <!-- Sidebar backdrop (mobile) -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <img src="img/uva-logo.svg" alt="UvA" class="sidebar-logo">
+            <span class="sidebar-title">API Gateway</span>
+            <button id="sidebar-toggle" class="sidebar-toggle">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-section">Dashboard</div>
+            <div class="sidebar-item active" data-view="overview">
+                <span class="material-symbols-outlined sidebar-icon">dashboard</span>
+                <span class="sidebar-label">Overview</span>
+            </div>
+            <div class="sidebar-item" data-view="endpoints">
+                <span class="material-symbols-outlined sidebar-icon">api</span>
+                <span class="sidebar-label">Endpoints</span>
+            </div>
+            <div class="sidebar-item" data-view="logs">
+                <span class="material-symbols-outlined sidebar-icon">list_alt</span>
+                <span class="sidebar-label">Request Logs</span>
+            </div>
+
+            <div class="sidebar-section">Infrastructure</div>
+            <div class="sidebar-item" data-view="tunnel">
+                <span class="material-symbols-outlined sidebar-icon">cloud</span>
+                <span class="sidebar-label">Tunnel</span>
+            </div>
+            <div class="sidebar-item" data-view="ai">
+                <span class="material-symbols-outlined sidebar-icon">smart_toy</span>
+                <span class="sidebar-label">AI Backend</span>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user-info">
+                <div id="sidebar-user" class="sidebar-user"></div>
+            </div>
+            <button id="btn-logout" class="btn-icon" title="Logout">
+                <span class="material-symbols-outlined">logout</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- Overview View -->
+        <div id="view-overview" class="view">
+            <div class="view-header">
+                <h2>Overview</h2>
+            </div>
+            <div class="view-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Endpoints</div>
+                        <div class="stat-value" id="stat-endpoints">-</div>
+                        <div class="stat-sub">active / total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Requests</div>
+                        <div class="stat-value" id="stat-requests-total">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Requests Today</div>
+                        <div class="stat-value" id="stat-requests-today">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Tunnel</div>
+                        <div class="stat-value" id="stat-tunnel">stopped</div>
+                        <div class="stat-sub" id="stat-tunnel-url"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Endpoints View -->
+        <div id="view-endpoints" class="view hidden">
+            <div class="view-header">
+                <h2>Endpoints</h2>
+                <button id="btn-create-endpoint" class="btn btn-primary">
+                    <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">add</span>
+                    Create Endpoint
+                </button>
+            </div>
+            <div class="view-body">
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th>Type</th>
+                                <th class="hide-mobile">Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="endpoints-tbody">
+                            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs View -->
+        <div id="view-logs" class="view hidden">
+            <div class="view-header">
+                <h2>Request Logs</h2>
+                <button id="btn-logs-refresh" class="btn">Refresh</button>
+            </div>
+            <div class="view-body">
+                <div class="log-filters">
+                    <select id="log-filter-method">
+                        <option value="">All Methods</option>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="OPTIONS">OPTIONS</option>
+                    </select>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th>Status</th>
+                                <th class="hide-mobile">Duration</th>
+                                <th class="hide-mobile">Client IP</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-tbody">
+                            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                    <div class="pagination">
+                        <span id="logs-page-info">-</span>
+                        <div class="pagination-buttons">
+                            <button class="btn btn-sm" id="btn-logs-prev" onclick="Dashboard.logs.prevPage()" disabled>Previous</button>
+                            <button class="btn btn-sm" id="btn-logs-next" onclick="Dashboard.logs.nextPage()" disabled>Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tunnel View -->
+        <div id="view-tunnel" class="view hidden">
+            <div class="view-header">
+                <h2>Cloudflare Tunnel</h2>
+            </div>
+            <div class="view-body">
+                <div class="stat-card" style="margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <span id="tunnel-status-dot" class="status-dot offline"></span>
+                        <span id="tunnel-status-text" style="font-weight: 600;">Stopped</span>
+                    </div>
+                    <div id="tunnel-url" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">
+                        No tunnel active
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-tunnel-start" class="btn btn-primary">Start Tunnel</button>
+                        <button id="btn-tunnel-stop" class="btn btn-danger" disabled>Stop Tunnel</button>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3 style="font-size: 16px; margin-bottom: 8px;">How it works</h3>
+                    <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+                        Cloudflare Tunnel exposes your local API gateway to the internet through a
+                        secure tunnel. Click "Start Tunnel" to get a temporary
+                        <code>*.trycloudflare.com</code> URL, or configure a named tunnel with a
+                        custom domain via the <code>CLOUDFLARED_CONFIG</code> environment variable.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Backend View -->
+        <div id="view-ai" class="view hidden">
+            <div class="view-header">
+                <h2>AI Backend</h2>
+            </div>
+            <div class="view-body">
+                <div class="stat-card" style="margin-bottom: 20px;">
+                    <h3 style="font-size: 16px; margin-bottom: 16px;">UvA Backend Settings</h3>
+                    <form id="ai-settings-form" onsubmit="event.preventDefault(); Dashboard.ai.save();">
+                        <label style="display: block; margin-bottom: 12px;">
+                            Base URL
+                            <input type="text" id="ai-base-url" placeholder="https://uva-ai.example.com" style="width: 100%; margin-top: 4px;">
+                        </label>
+                        <label style="display: block; margin-bottom: 12px;">
+                            Session Cookie
+                            <input type="password" id="ai-cookie" placeholder="session=..." style="width: 100%; margin-top: 4px;">
+                        </label>
+                        <label style="display: block; margin-bottom: 16px;">
+                            Default Model
+                            <select id="ai-default-model" style="width: 100%; margin-top: 4px;">
+                                <option value="gpt-4.1">GPT-4.1</option>
+                                <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                                <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                <option value="o3">o3</option>
+                                <option value="o4-mini">o4-mini</option>
+                                <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+                                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            </select>
+                        </label>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                        <span id="ai-save-status" style="margin-left: 12px; font-size: 14px; color: var(--text-secondary);"></span>
+                    </form>
+                </div>
+                <div class="stat-card">
+                    <h3 style="font-size: 16px; margin-bottom: 8px;">Responses API</h3>
+                    <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+                        The <code>/v1/responses</code> endpoint implements the OpenAI Responses API
+                        with tool-use orchestration. External tools like Claude Code and Codex CLI
+                        can connect to this endpoint. Configure the UvA backend URL and session
+                        cookie above to enable it.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Endpoint Create/Edit Modal -->
+<div id="modal-endpoint" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-endpoint-title">Create Endpoint</h3>
+            <button class="modal-close" onclick="Dashboard.endpoints.closeModal()">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); Dashboard.endpoints.saveEndpoint();" class="endpoint-form">
+            <input type="hidden" id="ep-handler-type" value="static">
+
+            <div class="form-row">
+                <label>
+                    Method
+                    <select id="ep-method">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="ALL">ALL (any method)</option>
+                    </select>
+                </label>
+                <label>
+                    Path
+                    <input type="text" id="ep-path" placeholder="/my-endpoint" required>
+                </label>
+            </div>
+
+            <label>
+                Description
+                <input type="text" id="ep-description" placeholder="What does this endpoint do?">
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 8px;">
+                <label class="toggle">
+                    <input type="checkbox" id="ep-enabled" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                Enabled
+            </label>
+
+            <div style="margin-bottom: 8px; font-size: 14px; color: var(--text-secondary);">Handler Type</div>
+            <div class="handler-types">
+                <button type="button" class="handler-type-btn" data-type="static" onclick="Dashboard.endpoints.setHandlerType('static')">Static JSON</button>
+                <button type="button" class="handler-type-btn active" data-type="proxy" onclick="Dashboard.endpoints.setHandlerType('proxy')">Proxy</button>
+                <button type="button" class="handler-type-btn" data-type="script" onclick="Dashboard.endpoints.setHandlerType('script')">Script</button>
+            </div>
+
+            <!-- Proxy config -->
+            <div id="config-proxy" class="config-section hidden">
+                <label>
+                    Target URL
+                    <input type="text" id="ep-proxy-url" placeholder="https://api.example.com/data">
+                </label>
+                <label>
+                    Inject Authorization Header (optional)
+                    <input type="text" id="ep-proxy-inject-auth" placeholder="Bearer your-api-key-here">
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                    <label class="toggle">
+                        <input type="checkbox" id="ep-proxy-forward-auth">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    Forward client Authorization header to upstream
+                </label>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    Use wildcard paths (e.g. <code>/v1/*</code>) to proxy all sub-paths.
+                    Supports streaming/SSE for AI API endpoints (chat completions, tool use).
+                </p>
+            </div>
+
+            <!-- Static config -->
+            <div id="config-static" class="config-section">
+                <label>
+                    Status Code
+                    <input type="number" id="ep-static-status" value="200" min="100" max="599">
+                </label>
+                <label>
+                    Response Body (JSON or text)
+                    <textarea id="ep-static-body" rows="4" placeholder='{"message": "Hello, world!"}'></textarea>
+                </label>
+            </div>
+
+            <!-- Script config -->
+            <div id="config-script" class="config-section hidden">
+                <label>
+                    JavaScript Code
+                    <textarea id="ep-script-code" class="code-input" placeholder="// Access request via 'request' object&#10;// Respond via 'response.json({...})' or 'response.send(...)'&#10;&#10;response.json({ hello: 'world', method: request.method });"></textarea>
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="Dashboard.endpoints.closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="js/core/api.js"></script>
+<script src="js/core/auth.js"></script>
+<script src="js/core/router.js"></script>
+<script src="js/core/sidebar.js"></script>
+<script src="js/views/overview.js"></script>
+<script src="js/views/endpoints.js"></script>
+<script src="js/views/logs.js"></script>
+<script src="js/views/tunnel.js"></script>
+<script src="js/views/ai.js"></script>
+<script src="js/core/app.js"></script>
+</body>
+</html>
