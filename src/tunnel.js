@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const config = require('./config');
+const db = require('./db');
 
 let tunnelProcess = null;
 let tunnelUrl = null;
@@ -14,6 +15,18 @@ function getStatus() {
   };
 }
 
+/* Read cloudflare_token from ai_settings table */
+function getStoredToken() {
+  try {
+    const row = db.getDb().prepare(
+      "SELECT value FROM ai_settings WHERE key = 'cloudflare_token'"
+    ).get();
+    return row ? row.value : null;
+  } catch {
+    return null;
+  }
+}
+
 function start() {
   if (tunnelProcess) {
     return { ok: false, message: 'Tunnel is already running' };
@@ -23,8 +36,12 @@ function start() {
   tunnelUrl = null;
   tunnelError = null;
 
+  const token = process.env.CLOUDFLARE_TOKEN || getStoredToken();
   let args;
-  if (config.cloudflaredConfig) {
+  if (token) {
+    /* Named tunnel via token (no config file needed) */
+    args = ['tunnel', 'run', '--token', token];
+  } else if (config.cloudflaredConfig) {
     /* Named tunnel with config file */
     args = ['tunnel', '--config', config.cloudflaredConfig, 'run'];
   } else {
@@ -51,9 +68,17 @@ function start() {
       tunnelStatus = 'running';
       console.log('Tunnel URL:', tunnelUrl);
     }
-    /* Named tunnel uses a custom domain, detect "registered connectors" */
+    /* Named tunnel (token or config): detect registered connectors */
     if (line.includes('Registered tunnel connection')) {
       tunnelStatus = 'running';
+    }
+    /* Named tunnel: extract the configured hostname */
+    const hostMatch = line.match(/https:\/\/[^\s]+/);
+    if (token && !tunnelUrl && line.includes('INF') && hostMatch) {
+      const candidate = hostMatch[0];
+      if (!candidate.includes('trycloudflare.com') && candidate.includes('.')) {
+        tunnelUrl = candidate;
+      }
     }
   });
 

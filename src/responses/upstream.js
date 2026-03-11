@@ -55,7 +55,7 @@ function translateToUva(messages, model, opts) {
       isNewChat: true,
     },
     overrides: {
-      model: model || 'gpt-4.1',
+      model: model || 'gpt-5.1',
       personaId: '',
     },
     requestTime: new Date().toISOString(),

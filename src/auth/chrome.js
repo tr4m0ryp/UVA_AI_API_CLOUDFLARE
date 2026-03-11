@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
+const Database = require('better-sqlite3');
 const { findChromeCookiesDb } = require('./cookie-paths');
 
 const CHROME_SALT = 'saltysalt';
@@ -53,16 +54,13 @@ function decryptV10(encrypted, key) {
 
 /*
  * Extract a specific cookie from Chrome/Chromium for a given domain.
+ * Uses better-sqlite3 (no sqlite3 CLI dependency).
  * Returns the cookie value or null.
  */
 function extractChromeCookie(domain, name) {
   const dbPath = findChromeCookiesDb();
   if (!dbPath) return null;
 
-  return readCookieFromDb(dbPath, domain, name);
-}
-
-function readCookieFromDb(dbPath, domain, name) {
   const tmp = path.join(os.tmpdir(), `uva_chrome_${process.pid}.sqlite`);
 
   try {
@@ -71,41 +69,41 @@ function readCookieFromDb(dbPath, domain, name) {
     if (fs.existsSync(walSrc)) {
       fs.copyFileSync(walSrc, tmp + '-wal');
     }
+    const shmSrc = dbPath + '-shm';
+    if (fs.existsSync(shmSrc)) {
+      fs.copyFileSync(shmSrc, tmp + '-shm');
+    }
   } catch {
     return null;
   }
 
+  let db;
   try {
-    /* Use sqlite3 CLI to get the encrypted_value as hex */
-    const sql = `SELECT hex(encrypted_value), value FROM cookies WHERE host_key LIKE '%${domain}%' AND name = '${name}' ORDER BY last_access_utc DESC LIMIT 1;`;
-    const output = execSync(`sqlite3 '${tmp}' "${sql}" 2>/dev/null`, {
-      encoding: 'utf8',
-      timeout: 5000,
-    }).trim();
+    db = new Database(tmp, { readonly: true, fileMustExist: true });
 
-    if (!output) return null;
+    const row = db.prepare(
+      'SELECT encrypted_value, value FROM cookies WHERE host_key LIKE ? AND name = ? ORDER BY last_access_utc DESC LIMIT 1'
+    ).get(`%${domain}%`, name);
 
-    /* sqlite3 outputs: hex_encrypted|plaintext_value */
-    const parts = output.split('|');
-    const hexEnc = parts[0];
-    const plainValue = parts[1] || '';
+    if (!row) return null;
 
     /* Try encrypted value first */
-    if (hexEnc && hexEnc.length > 6) {
+    if (row.encrypted_value && row.encrypted_value.length > 3) {
       const key = deriveChromeKey();
-      const encrypted = Buffer.from(hexEnc, 'hex');
-      const decrypted = decryptV10(encrypted, key);
+      const decrypted = decryptV10(row.encrypted_value, key);
       if (decrypted) return decrypted;
     }
 
     /* Fall back to plaintext */
-    if (plainValue) return plainValue;
+    if (row.value) return row.value;
     return null;
   } catch {
     return null;
   } finally {
+    if (db) try { db.close(); } catch {}
     try { fs.unlinkSync(tmp); } catch {}
     try { fs.unlinkSync(tmp + '-wal'); } catch {}
+    try { fs.unlinkSync(tmp + '-shm'); } catch {}
   }
 }
 

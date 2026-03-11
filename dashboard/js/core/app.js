@@ -26,12 +26,12 @@ Dashboard.app = (function() {
             mount: Dashboard.logs.mount,
             unmount: Dashboard.logs.unmount
         });
-        Dashboard.router.register('tunnel', {
-            mount: Dashboard.tunnel.mount,
-            unmount: Dashboard.tunnel.unmount
+        Dashboard.router.register('connectivity', {
+            mount: Dashboard.connectivity.mount,
+            unmount: Dashboard.connectivity.unmount
         });
-        Dashboard.router.register('ai', {
-            mount: Dashboard.ai.mount
+        Dashboard.router.register('settings', {
+            mount: Dashboard.settings.mount
         });
 
         /* Check for existing session */

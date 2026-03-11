@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-const VALID_KEYS = ['uva_base_url', 'uva_cookie', 'default_model'];
+const VALID_KEYS = ['uva_cookie', 'default_model'];
 
 /* GET / -- return all AI settings */
 router.get('/', (req, res) => {

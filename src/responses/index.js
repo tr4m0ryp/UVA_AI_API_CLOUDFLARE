@@ -66,16 +66,11 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const baseUrl = getAiSetting('uva_base_url');
-  if (!baseUrl) {
-    return res.status(500).json({
-      error: { message: 'AI backend URL not configured. Set via dashboard.' },
-    });
-  }
+  const baseUrl = 'https://aichat.uva.nl';
 
   const rr = parseRequest(req.body);
   if (!rr.model) {
-    rr.model = getAiSetting('default_model') || 'gpt-4.1';
+    rr.model = getAiSetting('default_model') || 'gpt-5.1';
   }
 
   console.error('  [responses] model=%s stream=%s tools=%s prev=%s',

@@ -23,22 +23,54 @@ function getStatus() {
   return { ...loginState };
 }
 
+/* Complete login with a validated cookie: issue JWT, store session. */
+function completeLogin(cookie, session) {
+  const token = signToken({ email: session.email, name: session.name });
+
+  const d = db.getDb();
+  d.prepare(`
+    INSERT INTO sessions (email, name, token, uva_cookie)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(token) DO UPDATE SET
+      uva_cookie = excluded.uva_cookie,
+      updated_at = datetime('now')
+  `).run(session.email, session.name, token, cookie);
+
+  loginState = {
+    status: 'success',
+    token,
+    email: session.email,
+    name: session.name,
+  };
+}
+
 /*
  * Start the browser login flow:
- * 1. Open aichat.uva.nl in the default browser
- * 2. Poll browser cookie databases for a valid session
+ * 1. Check if user is already logged in (existing browser cookies)
+ * 2. If not, open aichat.uva.nl and poll for a new session
  */
-function startLogin() {
+async function startLogin() {
   if (loginState.status === 'pending') {
     return { ok: false, message: 'Login already in progress' };
   }
 
   loginState = { status: 'pending' };
 
-  /* Open browser */
+  /* Check for existing cookies before opening browser.
+   * If the user is already logged in, reuse the session immediately. */
+  const existingCookie = tryExtractCookie();
+  if (existingCookie) {
+    const session = await validateSession(existingCookie);
+    if (session.valid) {
+      console.error('  [auth] reusing existing session for %s', session.email);
+      completeLogin(existingCookie, session);
+      return { ok: true };
+    }
+  }
+
+  /* No valid existing session -- open browser and poll */
   exec('xdg-open https://aichat.uva.nl 2>/dev/null');
 
-  /* Start polling cookies */
   const startTime = Date.now();
   pollTimer = setInterval(async () => {
     if (Date.now() - startTime > POLL_TIMEOUT_MS) {
@@ -55,25 +87,7 @@ function startLogin() {
 
     clearInterval(pollTimer);
     pollTimer = null;
-
-    /* Issue JWT and store session */
-    const token = signToken({ email: session.email, name: session.name });
-
-    const d = db.getDb();
-    d.prepare(`
-      INSERT INTO sessions (email, name, token, uva_cookie)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(token) DO UPDATE SET
-        uva_cookie = excluded.uva_cookie,
-        updated_at = datetime('now')
-    `).run(session.email, session.name, token, cookie);
-
-    loginState = {
-      status: 'success',
-      token,
-      email: session.email,
-      name: session.name,
-    };
+    completeLogin(cookie, session);
   }, POLL_INTERVAL_MS);
 
   return { ok: true };

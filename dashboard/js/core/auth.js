@@ -53,10 +53,17 @@ Dashboard.auth = (function() {
         hideError();
         browserLoginBtn.disabled = true;
         browserStatusDiv.classList.remove('hidden');
-        browserStatusText.textContent = 'Opening browser...';
+        browserStatusText.textContent = 'Checking existing session...';
 
         rawPost('/api/admin/auth/browser-login')
-            .then(function() {
+            .then(function(data) {
+                /* If existing cookies were valid, login completed instantly */
+                if (data.status === 'success') {
+                    Dashboard.api.setToken(data.token);
+                    Dashboard.app.showDashboard(data.email, data.name);
+                    resetBrowserUI();
+                    return;
+                }
                 browserStatusText.textContent =
                     'Waiting for login at aichat.uva.nl...';
                 pollStartTime = Date.now();

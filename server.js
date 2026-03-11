@@ -37,6 +37,7 @@ const adminLogs = require('./src/routes/admin-logs');
 const adminOverview = require('./src/routes/admin-overview');
 const adminTunnel = require('./src/routes/admin-tunnel');
 const adminAi = require('./src/routes/admin-ai');
+const adminSettings = require('./src/routes/admin-settings');
 const responsesRouter = require('./src/responses');
 
 app.use('/api/admin/auth', adminAuth);
@@ -45,6 +46,7 @@ app.use('/api/admin/logs', authMiddleware, adminLogs);
 app.use('/api/admin/overview', authMiddleware, adminOverview);
 app.use('/api/admin/tunnel', authMiddleware, adminTunnel);
 app.use('/api/admin/ai', authMiddleware, adminAi);
+app.use('/api/admin/settings', authMiddleware, adminSettings);
 
 /* Responses API (mounted before dynamic router) */
 app.use('/v1/responses', responsesRouter);

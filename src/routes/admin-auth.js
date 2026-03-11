@@ -5,12 +5,14 @@ const authMiddleware = require('../middleware/auth');
 const db = require('../db');
 
 /* POST /api/admin/auth/browser-login -- start browser login flow */
-router.post('/browser-login', (req, res) => {
-  const result = browserLogin.startLogin();
+router.post('/browser-login', async (req, res) => {
+  const result = await browserLogin.startLogin();
   if (!result.ok) {
     return res.status(409).json({ error: { message: result.message } });
   }
-  res.json({ status: 'pending' });
+  /* If existing cookies were found, login completed instantly */
+  const status = browserLogin.getStatus();
+  res.json(status);
 });
 
 /* GET /api/admin/auth/browser-status -- poll login status */

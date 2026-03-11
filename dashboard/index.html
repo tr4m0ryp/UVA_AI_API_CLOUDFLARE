@@ -76,13 +76,15 @@
             </div>
 
             <div class="sidebar-section">Infrastructure</div>
-            <div class="sidebar-item" data-view="tunnel">
-                <span class="material-symbols-outlined sidebar-icon">cloud</span>
-                <span class="sidebar-label">Tunnel</span>
+            <div class="sidebar-item" data-view="connectivity">
+                <span class="material-symbols-outlined sidebar-icon">hub</span>
+                <span class="sidebar-label">Connectivity</span>
             </div>
-            <div class="sidebar-item" data-view="ai">
-                <span class="material-symbols-outlined sidebar-icon">smart_toy</span>
-                <span class="sidebar-label">AI Backend</span>
+
+            <div class="sidebar-section">System</div>
+            <div class="sidebar-item" data-view="settings">
+                <span class="material-symbols-outlined sidebar-icon">settings</span>
+                <span class="sidebar-label">Settings</span>
             </div>
         </nav>
 
@@ -203,13 +205,16 @@
             </div>
         </div>
 
-        <!-- Tunnel View -->
-        <div id="view-tunnel" class="view hidden">
+        <!-- Connectivity View (Tunnel + AI Backend) -->
+        <div id="view-connectivity" class="view hidden">
             <div class="view-header">
-                <h2>Cloudflare Tunnel</h2>
+                <h2>Connectivity</h2>
             </div>
             <div class="view-body">
+
+                <!-- Tunnel Status & Control -->
                 <div class="stat-card" style="margin-bottom: 20px;">
+                    <h3 style="font-size: 16px; margin-bottom: 16px;">Tunnel Status</h3>
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
                         <span id="tunnel-status-dot" class="status-dot offline"></span>
                         <span id="tunnel-status-text" style="font-weight: 600;">Stopped</span>
@@ -222,60 +227,125 @@
                         <button id="btn-tunnel-stop" class="btn btn-danger" disabled>Stop Tunnel</button>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <h3 style="font-size: 16px; margin-bottom: 8px;">How it works</h3>
-                    <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
-                        Cloudflare Tunnel exposes your local API gateway to the internet through a
-                        secure tunnel. Click "Start Tunnel" to get a temporary
-                        <code>*.trycloudflare.com</code> URL, or configure a named tunnel with a
-                        custom domain via the <code>CLOUDFLARED_CONFIG</code> environment variable.
-                    </p>
-                </div>
-            </div>
-        </div>
 
-        <!-- AI Backend View -->
-        <div id="view-ai" class="view hidden">
-            <div class="view-header">
-                <h2>AI Backend</h2>
-            </div>
-            <div class="view-body">
+                <!-- Cloudflare Setup Guide -->
                 <div class="stat-card" style="margin-bottom: 20px;">
-                    <h3 style="font-size: 16px; margin-bottom: 16px;">UvA Backend Settings</h3>
-                    <form id="ai-settings-form" onsubmit="event.preventDefault(); Dashboard.ai.save();">
+                    <h3 style="font-size: 16px; margin-bottom: 12px;">Cloudflare Tunnel Setup</h3>
+                    <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.8;">
+                        <p style="margin-bottom: 12px;">
+                            A Cloudflare Tunnel exposes your local gateway to the internet.
+                            You can use a quick tunnel (temporary URL) or a named tunnel with a
+                            persistent domain.
+                        </p>
+                        <p style="margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">Quick tunnel (no setup needed)</p>
+                        <p style="margin-bottom: 16px;">
+                            Leave the token field empty and click Start Tunnel. You will get a
+                            temporary <code>*.trycloudflare.com</code> URL.
+                        </p>
+                        <p style="margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">Named tunnel (persistent domain)</p>
+                        <ol style="padding-left: 20px; margin-bottom: 16px;">
+                            <li style="margin-bottom: 6px;">Install <code>cloudflared</code>: <code>brew install cloudflared</code> (macOS) or <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" style="color: var(--accent);">download here</a></li>
+                            <li style="margin-bottom: 6px;">Log in: <code>cloudflared tunnel login</code></li>
+                            <li style="margin-bottom: 6px;">Create a tunnel: <code>cloudflared tunnel create my-gateway</code></li>
+                            <li style="margin-bottom: 6px;">Add a DNS route: <code>cloudflared tunnel route dns my-gateway api.yourdomain.com</code></li>
+                            <li style="margin-bottom: 6px;">Copy the tunnel token from the Cloudflare Zero Trust dashboard (Tunnels &gt; your tunnel &gt; Configure &gt; Install connector)</li>
+                            <li>Paste the token below and click Save</li>
+                        </ol>
+                    </div>
+                    <form id="tunnel-token-form" onsubmit="event.preventDefault(); Dashboard.connectivity.saveToken();">
                         <label style="display: block; margin-bottom: 12px;">
-                            Base URL
-                            <input type="text" id="ai-base-url" placeholder="https://uva-ai.example.com" style="width: 100%; margin-top: 4px;">
+                            Tunnel Token
+                            <input type="password" id="tunnel-token" placeholder="eyJhIjoiN..." style="width: 100%; margin-top: 4px;">
                         </label>
-                        <label style="display: block; margin-bottom: 12px;">
-                            Session Cookie
-                            <input type="password" id="ai-cookie" placeholder="session=..." style="width: 100%; margin-top: 4px;">
-                        </label>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <button type="submit" class="btn btn-primary">Save Token</button>
+                            <span id="tunnel-token-status" style="font-size: 14px; color: var(--text-secondary);"></span>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- AI Model Settings -->
+                <div class="stat-card">
+                    <h3 style="font-size: 16px; margin-bottom: 12px;">AI Model Settings</h3>
+                    <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
+                        The <code>/v1/responses</code> endpoint connects to
+                        <code>aichat.uva.nl</code> using your session cookie (auto-filled from login).
+                        Select a default model for requests that do not specify one.
+                    </p>
+                    <form id="ai-settings-form" onsubmit="event.preventDefault(); Dashboard.connectivity.saveAi();">
                         <label style="display: block; margin-bottom: 16px;">
                             Default Model
                             <select id="ai-default-model" style="width: 100%; margin-top: 4px;">
-                                <option value="gpt-4.1">GPT-4.1</option>
-                                <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                                <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
-                                <option value="gpt-4o">GPT-4o</option>
-                                <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                <option value="o3">o3</option>
-                                <option value="o4-mini">o4-mini</option>
-                                <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-                                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                <optgroup label="GPT-5 family">
+                                    <option value="gpt-5.2">GPT-5.2</option>
+                                    <option value="gpt-5.1" selected>GPT-5.1</option>
+                                    <option value="gpt-5">GPT-5</option>
+                                    <option value="gpt-5-mini">GPT-5 Mini</option>
+                                    <option value="gpt-5-nano">GPT-5 Nano</option>
+                                </optgroup>
+                                <optgroup label="GPT-4 family">
+                                    <option value="gpt-4.1">GPT-4.1</option>
+                                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                                    <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+                                    <option value="gpt-4o">GPT-4o</option>
+                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                </optgroup>
+                                <optgroup label="Claude">
+                                    <option value="claude-opus-4.6">Claude Opus 4.6</option>
+                                    <option value="claude-opus-4.5">Claude Opus 4.5</option>
+                                    <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
+                                    <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
+                                    <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
+                                </optgroup>
+                                <optgroup label="Reasoning">
+                                    <option value="o3">o3</option>
+                                    <option value="o3-mini">o3 Mini</option>
+                                    <option value="o1">o1</option>
+                                </optgroup>
+                                <optgroup label="Open Source">
+                                    <option value="gpt-oss-120b">GPT-OSS 120B</option>
+                                    <option value="mistral-large">Mistral Large</option>
+                                    <option value="mistral-small-2503">Mistral Small</option>
+                                </optgroup>
                             </select>
                         </label>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <button type="submit" class="btn btn-primary">Save Model</button>
+                            <span id="ai-save-status" style="font-size: 14px; color: var(--text-secondary);"></span>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="view-settings" class="view hidden">
+            <div class="view-header">
+                <h2>Settings</h2>
+            </div>
+            <div class="view-body">
+                <div class="stat-card" style="margin-bottom: 20px;">
+                    <h3 style="font-size: 16px; margin-bottom: 16px;">Server Configuration</h3>
+                    <form id="settings-form" onsubmit="event.preventDefault(); Dashboard.settings.save();">
+                        <label style="display: block; margin-bottom: 12px;">
+                            Port
+                            <input type="number" id="settings-port" placeholder="3000" min="1" max="65535" style="width: 100%; margin-top: 4px;">
+                        </label>
+                        <label style="display: block; margin-bottom: 16px;">
+                            Cloudflared Config Path (optional)
+                            <input type="text" id="settings-cloudflared" placeholder="/path/to/cloudflared/config.yml" style="width: 100%; margin-top: 4px;">
+                        </label>
                         <button type="submit" class="btn btn-primary">Save Settings</button>
-                        <span id="ai-save-status" style="margin-left: 12px; font-size: 14px; color: var(--text-secondary);"></span>
+                        <span id="settings-save-status" style="margin-left: 12px; font-size: 14px; color: var(--text-secondary);"></span>
                     </form>
                 </div>
                 <div class="stat-card">
-                    <h3 style="font-size: 16px; margin-bottom: 8px;">Responses API</h3>
+                    <h3 style="font-size: 16px; margin-bottom: 8px;">Configuration</h3>
                     <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
-                        The <code>/v1/responses</code> endpoint implements the OpenAI Responses API
-                        with tool-use orchestration. External tools like Claude Code and Codex CLI
-                        can connect to this endpoint. Configure the UvA backend URL and session
-                        cookie above to enable it.
+                        These settings are stored in the <code>.env</code> file. Changes to the
+                        port require a server restart to take effect. The JWT secret is
+                        auto-generated and managed internally.
                     </p>
                 </div>
             </div>
@@ -317,19 +387,27 @@
                 <input type="text" id="ep-description" placeholder="What does this endpoint do?">
             </label>
 
-            <label style="display: flex; align-items: center; gap: 8px;">
-                <label class="toggle">
-                    <input type="checkbox" id="ep-enabled" checked>
-                    <span class="toggle-slider"></span>
+            <div style="margin-bottom: 12px;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <label class="toggle">
+                        <input type="checkbox" id="ep-enabled" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    Active
                 </label>
-                Enabled
-            </label>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 52px;">Endpoint accepts requests when active</p>
+            </div>
 
             <div style="margin-bottom: 8px; font-size: 14px; color: var(--text-secondary);">Handler Type</div>
             <div class="handler-types">
                 <button type="button" class="handler-type-btn" data-type="static" onclick="Dashboard.endpoints.setHandlerType('static')">Static JSON</button>
                 <button type="button" class="handler-type-btn active" data-type="proxy" onclick="Dashboard.endpoints.setHandlerType('proxy')">Proxy</button>
                 <button type="button" class="handler-type-btn" data-type="script" onclick="Dashboard.endpoints.setHandlerType('script')">Script</button>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-top: 6px;">
+                <strong>Proxy</strong> -- Forward requests to another API (use for external services)<br>
+                <strong>Static JSON</strong> -- Return a fixed response (use for mocks / health checks)<br>
+                <strong>Script</strong> -- Run custom JavaScript (use for transformations)
             </div>
 
             <!-- Proxy config -->
@@ -391,8 +469,8 @@
 <script src="js/views/overview.js"></script>
 <script src="js/views/endpoints.js"></script>
 <script src="js/views/logs.js"></script>
-<script src="js/views/tunnel.js"></script>
-<script src="js/views/ai.js"></script>
+<script src="js/views/connectivity.js"></script>
+<script src="js/views/settings.js"></script>
 <script src="js/core/app.js"></script>
 </body>
 </html>
