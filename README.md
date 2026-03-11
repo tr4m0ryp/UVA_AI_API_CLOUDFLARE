@@ -16,7 +16,7 @@ UvA API Self-Host lets you run a personal API gateway on your own machine and ma
 
 The idea is simple: you start the gateway locally, connect it to the internet via a Cloudflare Tunnel, and point your personal domain at it. Once that is in place, you have a stable, self-controlled URL that you can plug into any tool or service that accepts a custom API endpoint -- model providers, development tools, automation platforms, or anything else that lets you configure a base URL.
 
-Instead of relying on third-party hosted services or juggling temporary URLs, you get a permanent address under your own domain that routes directly to software running on your hardware. You decide what each endpoint does: proxy requests to another service, return a fixed response, or run custom JavaScript logic. Everything is managed through a built-in web dashboard -- no config files to hand-edit, no CLI-only workflows.
+Instead of constantly running the entire UVA AI V2 project, you can just set this up on a local machine running at home or a hosted vps
 
 Authentication piggybacks on your existing University of Amsterdam account. The gateway reads session cookies from your browser, validates them against UvA's session API, and issues local tokens. There is no separate user database, no passwords to manage, and no OAuth setup.
 
