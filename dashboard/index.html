@@ -265,7 +265,7 @@
                 </div>
 
                 <!-- AI Model Settings -->
-                <div class="stat-card">
+                <div class="stat-card" style="margin-bottom: 20px;">
                     <h3 style="font-size: 16px; margin-bottom: 12px;">AI Model Settings</h3>
                     <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
                         The <code>/v1/responses</code> endpoint connects to
@@ -312,6 +312,44 @@
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <button type="submit" class="btn btn-primary">Save Model</button>
                             <span id="ai-save-status" style="font-size: 14px; color: var(--text-secondary);"></span>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- UvA Extensions (MCP Tools) -->
+                <div class="stat-card" style="margin-bottom: 20px;">
+                    <h3 style="font-size: 16px; margin-bottom: 12px;">UvA Extensions</h3>
+                    <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
+                        Configure MCP extensions (Filesystem, Shell, Memory, etc.) so the UvA
+                        backend executes them server-side. When enabled, the Hermes prompt
+                        injection fallback is bypassed and UvA handles tool calls natively.
+                    </p>
+                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
+                        The UvA backend links extensions to chat threads. The
+                        <code>thread_id</code> must reference a thread that has
+                        your extensions (Filesystem, Shell, etc.) linked to it.
+                        The gateway reuses this thread ID so the backend loads
+                        those extensions for every request.
+                    </p>
+                    <form id="extensions-form" onsubmit="event.preventDefault(); Dashboard.connectivity.saveExtensions();">
+                        <label style="display: block; margin-bottom: 16px;">
+                            Chat Endpoint
+                            <select id="ext-chat-endpoint" style="width: 100%; margin-top: 4px;">
+                                <option value="/api/v1/chat">/api/v1/chat (default UvA endpoint)</option>
+                                <option value="/api/chat/completions">/api/chat/completions (Open WebUI endpoint)</option>
+                            </select>
+                        </label>
+                        <label style="display: block; margin-bottom: 16px;">
+                            Extension Config (JSON)
+                            <textarea id="ext-config-json" rows="10" placeholder='{
+  "thread_id": "your_uva_thread_id_with_extensions_linked",
+  "extension_ids": ["ext_id_1", "ext_id_2"]
+}' style="width: 100%; margin-top: 4px; font-family: monospace; font-size: 13px; resize: vertical;"></textarea>
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <button type="submit" class="btn btn-primary">Save Extensions</button>
+                            <button type="button" class="btn" onclick="Dashboard.connectivity.clearExtensions()">Clear</button>
+                            <span id="ext-save-status" style="font-size: 14px; color: var(--text-secondary);"></span>
                         </div>
                     </form>
                 </div>

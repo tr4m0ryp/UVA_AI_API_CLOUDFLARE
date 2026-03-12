@@ -1,6 +1,12 @@
 /*
  * POST /v1/responses -- Native Responses API with tool-use orchestration.
  * Port of route.c from UVA_AI_V2.
+ *
+ * Supports two tool modes:
+ *   1. UvA extensions (server-side): tool_ids / tool_servers sent to UvA backend,
+ *      which executes tools via MCP and returns the final response.
+ *   2. Hermes prompt injection (client-side): tool definitions injected into
+ *      system prompt, model responds with <tool_call> XML, client executes.
  */
 const express = require('express');
 const router = express.Router();
@@ -11,7 +17,7 @@ const { inputToMessages, foldToolResults } = require('./input');
 const { buildToolPrompt, buildToolReminder } = require('./tool-prompt');
 const { tryParseTools } = require('./tool-parse');
 const { stripToolCalls } = require('./tool-strip');
-const { bufferUpstream, streamUpstream } = require('./upstream');
+const { bufferUpstream, streamUpstream, bufferWithToolExec, streamWithToolExec } = require('./upstream');
 const state = require('./state');
 const emitter = require('./emitter');
 
@@ -49,6 +55,58 @@ function getAiSetting(key) {
   return row ? row.value : null;
 }
 
+/* Load UvA extension config from ai_settings.
+ * Returns { threadId, toolIds, toolServers, features } or null.
+ *
+ * The key field is thread_id: a UvA chat thread that has extensions linked
+ * to it on the backend. When we send messages using that thread ID, the
+ * UvA backend loads the linked extensions (Filesystem, Shell, Memory, etc.)
+ * and makes their tools available to the model.
+ *
+ * Config format in ai_settings:
+ * {
+ *   "thread_id": "DWoS7vzbAPfBwSW6Y977MHmZ61ODRnLzdAvm",
+ *   "tool_ids": [],       // optional: explicit tool IDs
+ *   "tool_servers": [],   // optional: MCP server configs
+ *   "features": {}        // optional: feature flags
+ * }
+ */
+function loadExtensions() {
+  const raw = getAiSetting('enabled_extensions');
+  if (!raw) return null;
+
+  try {
+    const cfg = JSON.parse(raw);
+    const ext = {};
+    let hasAny = false;
+
+    if (cfg.thread_id && typeof cfg.thread_id === 'string') {
+      ext.threadId = cfg.thread_id;
+      hasAny = true;
+    }
+    if (Array.isArray(cfg.tool_ids) && cfg.tool_ids.length > 0) {
+      ext.toolIds = cfg.tool_ids;
+      hasAny = true;
+    } else if (Array.isArray(cfg.extension_ids) && cfg.extension_ids.length > 0) {
+      ext.toolIds = cfg.extension_ids;
+      hasAny = true;
+    }
+    if (Array.isArray(cfg.tool_servers) && cfg.tool_servers.length > 0) {
+      ext.toolServers = cfg.tool_servers;
+      hasAny = true;
+    }
+    if (cfg.features && typeof cfg.features === 'object') {
+      ext.features = cfg.features;
+      hasAny = true;
+    }
+
+    return hasAny ? ext : null;
+  } catch {
+    console.error('  [responses] invalid enabled_extensions JSON in ai_settings');
+    return null;
+  }
+}
+
 function startSse(res) {
   res.set({
     'Content-Type': 'text/event-stream',
@@ -73,8 +131,14 @@ router.post('/', async (req, res) => {
     rr.model = getAiSetting('default_model') || 'gpt-5.1';
   }
 
-  console.error('  [responses] model=%s stream=%s tools=%s prev=%s',
-    rr.model, rr.stream, rr.hasTools, rr.previousResponseId);
+  /* Load UvA extensions and chat endpoint from settings */
+  const extensions = loadExtensions();
+  const chatEndpoint = getAiSetting('chat_endpoint') || '/api/v1/chat';
+  const useNativeTools = !!extensions;
+
+  console.error('  [responses] model=%s stream=%s tools=%s prev=%s extensions=%s endpoint=%s',
+    rr.model, rr.stream, rr.hasTools, rr.previousResponseId,
+    useNativeTools ? 'yes' : 'no', chatEndpoint);
 
   const result = {
     responseId: genId('resp_', 16),
@@ -111,8 +175,46 @@ router.post('/', async (req, res) => {
   };
 
   try {
-    if (injectTools) {
-      /* Prepend tool prompt as FIRST system message */
+    if (useNativeTools) {
+      /*
+       * UvA native extension mode with gateway-side tool execution.
+       * UvA's backend has a bug where it doesn't forward tool parameters
+       * to extension endpoints. We intercept tool calls from the SSE stream,
+       * execute them directly against the MCP servers, and send the results
+       * back to UvA as follow-up messages.
+       */
+      if (rr.stream) {
+        startSse(res);
+        result.fullText = await streamWithToolExec(res, messages, rr.model, baseUrl, cookie, opts, {
+          onFirstToken() {
+            emitter.emitCreated(res, result, rr.model);
+            emitter.emitOutputItemAdded(res, result, rr.model);
+            emitter.emitContentPartAdded(res, result);
+          },
+          onToken(token) {
+            emitter.emitTextDelta(res, result, token);
+          },
+          onDone(fullText) {
+            result.fullText = fullText;
+            emitter.emitTextDone(res, result);
+            emitter.emitContentPartDone(res, result);
+            emitter.emitOutputItemDone(res, result, rr.model);
+            emitter.emitCompleted(res, result, rr.model);
+          },
+        }, extensions, chatEndpoint);
+        res.end();
+      } else {
+        result.fullText = await bufferWithToolExec(messages, rr.model, baseUrl, cookie, opts, extensions, chatEndpoint);
+        res.json(emitter.buildNonstreamResponse(result, rr.model));
+      }
+
+    } else if (injectTools) {
+      /*
+       * Hermes prompt injection mode (client-side tools):
+       * Tool definitions are injected into the system prompt.
+       * Model responds with <tool_call> XML blocks.
+       * Client is responsible for executing tools and sending results back.
+       */
       const toolPrompt = buildToolPrompt(rr.tools);
       if (toolPrompt) {
         messages = [{ role: 'system', content: toolPrompt }, ...messages];

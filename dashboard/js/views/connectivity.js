@@ -1,4 +1,4 @@
-/* Connectivity -- Tunnel control + Cloudflare setup + AI model settings */
+/* Connectivity -- Tunnel control + Cloudflare setup + AI model settings + Extensions */
 var Dashboard = Dashboard || {};
 
 Dashboard.connectivity = (function() {
@@ -10,6 +10,7 @@ Dashboard.connectivity = (function() {
         loadStatus();
         loadToken();
         loadAiSettings();
+        loadExtensions();
         refreshTimer = setInterval(loadStatus, 5000);
     }
 
@@ -133,10 +134,74 @@ Dashboard.connectivity = (function() {
             });
     }
 
+    /* --- UvA Extensions --- */
+
+    function loadExtensions() {
+        Dashboard.api.get('/api/admin/ai')
+            .then(function(data) {
+                if (data.chat_endpoint) {
+                    document.getElementById('ext-chat-endpoint').value = data.chat_endpoint;
+                }
+                if (data.enabled_extensions) {
+                    try {
+                        var parsed = JSON.parse(data.enabled_extensions);
+                        document.getElementById('ext-config-json').value =
+                            JSON.stringify(parsed, null, 2);
+                    } catch(e) {
+                        document.getElementById('ext-config-json').value = data.enabled_extensions;
+                    }
+                }
+            })
+            .catch(function() {});
+    }
+
+    function saveExtensions() {
+        var statusEl = document.getElementById('ext-save-status');
+        var jsonText = document.getElementById('ext-config-json').value.trim();
+        var endpoint = document.getElementById('ext-chat-endpoint').value;
+
+        /* Validate JSON if provided */
+        if (jsonText) {
+            try {
+                JSON.parse(jsonText);
+            } catch(e) {
+                statusEl.textContent = 'Invalid JSON: ' + e.message;
+                statusEl.style.color = '#ef4444';
+                return;
+            }
+        }
+
+        statusEl.textContent = 'Saving...';
+        statusEl.style.color = '';
+
+        var settings = {
+            chat_endpoint: endpoint,
+            enabled_extensions: jsonText || '',
+        };
+
+        Dashboard.api.put('/api/admin/ai', settings)
+            .then(function() {
+                statusEl.textContent = jsonText ? 'Extensions saved' : 'Extensions cleared';
+                setTimeout(function() { statusEl.textContent = ''; }, 3000);
+            })
+            .catch(function(err) {
+                statusEl.textContent = 'Error: ' + err.message;
+                statusEl.style.color = '#ef4444';
+            });
+    }
+
+    function clearExtensions() {
+        document.getElementById('ext-config-json').value = '';
+        document.getElementById('ext-chat-endpoint').value = '/api/v1/chat';
+        saveExtensions();
+    }
+
     return {
         mount: mount,
         unmount: unmount,
         saveToken: saveToken,
-        saveAi: saveAi
+        saveAi: saveAi,
+        saveExtensions: saveExtensions,
+        clearExtensions: clearExtensions
     };
 })();
