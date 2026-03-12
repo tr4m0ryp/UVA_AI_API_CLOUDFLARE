@@ -134,10 +134,12 @@ router.post('/', async (req, res) => {
   /* Load UvA extensions and chat endpoint from settings */
   const extensions = loadExtensions();
   const chatEndpoint = getAiSetting('chat_endpoint') || '/api/v1/chat';
-  /* Use native extensions only when the client doesn't send its own tools.
-   * When clients like Openclaw send tool definitions, they need tool_call
-   * responses to drive their agent loop -- native extensions bypass that. */
-  const useNativeTools = !!extensions && !rr.hasTools;
+  /* Always use native extensions when configured. The gateway handles tool
+   * execution server-side (intercepting failed UvA calls), and the model
+   * returns a complete text response with tool results incorporated.
+   * Client-sent tool definitions are not used (Hermes mode doesn't work
+   * because UvA's system prompt overrides injected tool definitions). */
+  const useNativeTools = !!extensions;
 
   console.error('  [responses] model=%s stream=%s tools=%s prev=%s extensions=%s endpoint=%s',
     rr.model, rr.stream, rr.hasTools, rr.previousResponseId,
