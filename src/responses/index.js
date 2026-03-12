@@ -134,7 +134,10 @@ router.post('/', async (req, res) => {
   /* Load UvA extensions and chat endpoint from settings */
   const extensions = loadExtensions();
   const chatEndpoint = getAiSetting('chat_endpoint') || '/api/v1/chat';
-  const useNativeTools = !!extensions;
+  /* Use native extensions only when the client doesn't send its own tools.
+   * When clients like Openclaw send tool definitions, they need tool_call
+   * responses to drive their agent loop -- native extensions bypass that. */
+  const useNativeTools = !!extensions && !rr.hasTools;
 
   console.error('  [responses] model=%s stream=%s tools=%s prev=%s extensions=%s endpoint=%s',
     rr.model, rr.stream, rr.hasTools, rr.previousResponseId,
